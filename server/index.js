@@ -33,12 +33,16 @@ const MotorDirection = {
 const server = http.createServer();
 
 const indexHtml = readFileSync(__dirname + '/index.html');
+const configHtml = readFileSync(__dirname + '/config.html');
 
-// serve static index.html from file on / path
+// serve static HTML files
 server.on('request', (req, res) => {
   if (req.url === '/') {
     res.writeHead(200, {'Content-Type': 'text/html'});
     res.end(indexHtml);
+  } else if (req.url === '/config') {
+    res.writeHead(200, {'Content-Type': 'text/html'});
+    res.end(configHtml);
   }
 });
 
@@ -143,21 +147,66 @@ wssc.on('connection', (wsc) => {
   console.log('ORE0 connected');
   oreoClient = wsc;
 
+  // Send START_STREAM command to ESP32 when it connects
+  console.log('Sending START_STREAM command to ESP32');
+  wsc.send('START_STREAM');
+
   commandBus.subscribe((commands) => {
     // Forward commands to the ESP32
     console.log(`Sending commands to ESP32: ${Array.from(commands).map(c => '0x' + c.toString(16)).join(',')}`);
     wsc.send(commands);
   });
 
+  // Track current motor pin configuration
+  let motorPins = {
+    m1p1: 12, // Default values
+    m1p2: 13,
+    m2p1: 15,
+    m2p2: 14
+  };
+
   // receive binary data
   wsc.on('message', (data) => {
-    // binary data is a jpeg frame
-    // emit it to all clients as binary data
-    clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(data, {binary: true});
-      }
-    });
+    // Check if data is a command or a camera frame
+    if (data instanceof Buffer && data.length > 1000) {
+      // Likely a camera frame (JPEG images are typically larger than commands)
+      console.log(`Received camera frame: ${data.length} bytes`);
+      
+      // Forward camera frame to all clients
+      clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(data, {binary: true});
+        }
+      });
+    } else if (data instanceof Buffer && data.length >= 5 && data[0] === Commands.CMD_SET_MOTOR_PINS) {
+      // Response to SET_MOTOR_PINS command
+      console.log(`Received motor pin configuration from ESP32`);
+      
+      // Update stored pin configuration
+      motorPins = {
+        m1p1: data[1],
+        m1p2: data[2],
+        m2p1: data[3],
+        m2p2: data[4]
+      };
+      
+      // Notify all clients about the updated pin configuration
+      const pinMsg = JSON.stringify({
+        type: 'motor_pins',
+        ...motorPins
+      });
+      
+      clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(pinMsg);
+        }
+      });
+    } else {
+      // Other command response
+      console.log(`Received data from ESP32: ${data.length} bytes`);
+      
+      // Handle other command responses if needed
+    }
   });
 
   wsc.on('close', () => {
