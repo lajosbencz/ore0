@@ -1,6 +1,7 @@
 #include "websocket_client.h"
 #include "commands.h"
 #include "motor.h"
+#include <Arduino.h>
 
 // Function to handle binary motor commands
 void handle_binary_command(uint8_t *payload, size_t length)
@@ -85,6 +86,78 @@ void handle_binary_command(uint8_t *payload, size_t length)
         response.m1p2 = config.m1p2;
         response.m2p1 = config.m2p1;
         response.m2p2 = config.m2p2;
+      }
+      break;
+      
+    case CMD_SET_GPIO:
+      if (length >= sizeof(gpio_control_cmd_t))
+      {
+        gpio_control_cmd_t *gpio_cmd = (gpio_control_cmd_t *)payload;
+        uint8_t pin = gpio_cmd->pin;
+        uint8_t state = gpio_cmd->state;
+        
+        // Only allow pins 12-15 to be controlled
+        if (pin >= 12 && pin <= 15)
+        {
+          // Configure pin as output if not already
+          pinMode(pin, OUTPUT);
+          
+          // Set the pin state
+          digitalWrite(pin, state ? HIGH : LOW);
+          
+          Serial.printf("GPIO pin %d set to %s\n", pin, state ? "HIGH" : "LOW");
+          
+          // Send response with the current state
+          gpio_state_cmd_t response;
+          response.command = CMD_GET_GPIO;
+          response.pin = pin;
+          response.state = state;
+          
+          // Send the response back
+          if (WebSocketClient::instance && WebSocketClient::instance->isConnected())
+          {
+            WebSocketClient::instance->sendBinaryData((uint8_t*)&response, sizeof(response));
+          }
+        }
+        else
+        {
+          Serial.printf("Invalid GPIO pin: %d (only pins 12-15 are allowed)\n", pin);
+        }
+      }
+      break;
+      
+    case CMD_GET_GPIO:
+      if (length >= 2)
+      {
+        uint8_t pin = payload[1];
+        
+        // Only allow pins 12-15 to be queried
+        if (pin >= 12 && pin <= 15)
+        {
+          // Configure pin as input if not already
+          pinMode(pin, INPUT);
+          
+          // Read the pin state
+          uint8_t state = digitalRead(pin);
+          
+          Serial.printf("GPIO pin %d state: %s\n", pin, state ? "HIGH" : "LOW");
+          
+          // Send response with the current state
+          gpio_state_cmd_t response;
+          response.command = CMD_GET_GPIO;
+          response.pin = pin;
+          response.state = state;
+          
+          // Send the response back
+          if (WebSocketClient::instance && WebSocketClient::instance->isConnected())
+          {
+            WebSocketClient::instance->sendBinaryData((uint8_t*)&response, sizeof(response));
+          }
+        }
+        else
+        {
+          Serial.printf("Invalid GPIO pin: %d (only pins 12-15 are allowed)\n", pin);
+        }
       }
       break;
   }

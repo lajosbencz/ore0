@@ -7,7 +7,11 @@ typedef enum {
     
     // Motor pin configuration commands
     CMD_SET_MOTOR_PINS = 0x20,  // Command to set motor pins
-    CMD_GET_MOTOR_PINS = 0x21   // Command to get current motor pin configuration
+    CMD_GET_MOTOR_PINS = 0x21,  // Command to get current motor pin configuration
+    
+    // GPIO control commands
+    CMD_SET_GPIO = 0x30,        // Command to set GPIO pin state
+    CMD_GET_GPIO = 0x31         // Command to get GPIO pin state
 } command_t;
 
 // Motor direction values
@@ -40,5 +44,19 @@ typedef struct {
     uint8_t m2p1;               // Right motor pin 1
     uint8_t m2p2;               // Right motor pin 2
 } motor_pins_cmd_t;
+
+// Structure for GPIO control command
+typedef struct {
+    uint8_t command;            // CMD_SET_GPIO
+    uint8_t pin;                // GPIO pin number
+    uint8_t state;              // 0 = LOW, 1 = HIGH
+} gpio_control_cmd_t;
+
+// Structure for GPIO state response
+typedef struct {
+    uint8_t command;            // CMD_GET_GPIO
+    uint8_t pin;                // GPIO pin number
+    uint8_t state;              // 0 = LOW, 1 = HIGH
+} gpio_state_cmd_t;
 
 #endif // COMMANDS_H

@@ -21,6 +21,14 @@ void setup() {
   // Motor pin configuration can be changed via WebSocket commands
   motor_init(DEFAULT_M1P1, DEFAULT_M1P2, DEFAULT_M2P1, DEFAULT_M2P2);
   
+  // Initialize GPIO pins 12-15 as outputs
+  // These pins are also used for motors by default, but can be controlled directly via GPIO commands
+  for (int pin = 12; pin <= 15; pin++) {
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, LOW);
+    Serial.printf("Initialized GPIO pin %d as OUTPUT\n", pin);
+  }
+  
   // Initialize camera
   esp_err_t err = init_camera();
   if (err != ESP_OK) {

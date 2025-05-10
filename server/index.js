@@ -11,7 +11,11 @@ const Commands = {
   
   // Motor pin configuration commands
   CMD_SET_MOTOR_PINS: 0x20,  // Command to set motor pins
-  CMD_GET_MOTOR_PINS: 0x21   // Command to get current motor pin configuration
+  CMD_GET_MOTOR_PINS: 0x21,  // Command to get current motor pin configuration
+  
+  // GPIO control commands
+  CMD_SET_GPIO: 0x30,        // Command to set GPIO pin state
+  CMD_GET_GPIO: 0x31         // Command to get GPIO pin state
 };
 
 // Motor selection values
@@ -199,6 +203,22 @@ wssc.on('connection', (wsc) => {
       clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
           client.send(pinMsg);
+        }
+      });
+    } else if (data instanceof Buffer && data.length >= 3 && data[0] === Commands.CMD_GET_GPIO) {
+      // Response to GET_GPIO or SET_GPIO command
+      console.log(`Received GPIO state from ESP32: pin=${data[1]}, state=${data[2]}`);
+      
+      // Notify all clients about the GPIO state
+      const gpioMsg = JSON.stringify({
+        type: 'gpio_state',
+        pin: data[1],
+        state: data[2]
+      });
+      
+      clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(gpioMsg);
         }
       });
     } else {
