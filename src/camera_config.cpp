@@ -65,14 +65,47 @@ esp_err_t init_camera() {
   return ESP_OK;
 }
 
+// Function to deinitialize the camera
+void deinit_camera() {
+  esp_err_t err = esp_camera_deinit();
+  if (err != ESP_OK) {
+    Serial.printf("Camera deinit failed with error 0x%x", err);
+  } else {
+    Serial.println("Camera deinitialized");
+  }
+}
+
 // Function to setup LED flash
 void setupLedFlash(int pin) {
 #if defined(LED_GPIO_NUM)
   #if CONFIG_LED_ILLUMINATOR_ENABLED
     ledcAttachPin(pin, 1);
     ledcSetup(1, 5000, 8);
+    Serial.println("LED flash initialized");
   #else
     Serial.println("LED flash is disabled -> CONFIG_LED_ILLUMINATOR_ENABLED = 0");
+  #endif
+#endif
+}
+
+// Function to turn on LED flash
+void turnOnLedFlash(int pin) {
+#if defined(LED_GPIO_NUM)
+  #if CONFIG_LED_ILLUMINATOR_ENABLED
+    // Set LED brightness to maximum (255)
+    ledcWrite(1, 140);
+    Serial.println("LED flash turned on");
+  #endif
+#endif
+}
+
+// Function to turn off LED flash
+void turnOffLedFlash(int pin) {
+#if defined(LED_GPIO_NUM)
+  #if CONFIG_LED_ILLUMINATOR_ENABLED
+    ledcWrite(1, 0); // Turn off the LED
+    ledcDetachPin(pin);
+    Serial.println("LED flash turned off");
   #endif
 #endif
 }

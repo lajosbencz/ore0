@@ -76,9 +76,30 @@ let oreoClient = null;
 let lastOreoMessageTime = 0; // Track the last time a message was received from ORE0
 const clients = [];
 
+// Function to check if there are any clients connected
+function hasConnectedClients() {
+  return clients.length > 0;
+}
+
+// Function to send camera control commands to ESP32
+function sendCameraCommand(command) {
+  if (oreoClient && oreoClient.readyState === WebSocket.OPEN) {
+    console.log(`Sending ${command} command to ESP32`);
+    oreoClient.send(command);
+  }
+}
+
 wss.on('connection', (ws) => {
   console.log('Client connected');
+  
+  // If this is the first client and ESP32 is connected, start the camera stream
+  const isFirstClient = clients.length === 0;
   clients.push(ws);
+  
+  if (isFirstClient && oreoClient && oreoClient.readyState === WebSocket.OPEN) {
+    console.log('First client connected, starting camera stream');
+    sendCameraCommand('START_STREAM');
+  }
 
   ws.on('message', (data) => {
     const commands = new Uint8Array(data);
@@ -147,6 +168,13 @@ wss.on('connection', (ws) => {
     clients.splice(clients.indexOf(ws), 1);
     clearInterval(statusInterval);
     console.log('Client disconnected');
+    
+    // Check if this was the last client
+    if (!hasConnectedClients()) {
+      console.log('No clients connected, stopping camera stream');
+      // Send STOP_STREAM command to ESP32 to stop the camera
+      sendCameraCommand('STOP_STREAM');
+    }
   });
 });
 
@@ -158,9 +186,13 @@ wssc.on('connection', (wsc) => {
   oreoClient = wsc;
   lastOreoMessageTime = Date.now(); // Initialize the last message time
 
-  // Send START_STREAM command to ESP32 when it connects
-  console.log('Sending START_STREAM command to ESP32');
-  wsc.send('START_STREAM');
+  // Only start streaming if there are clients connected
+  if (hasConnectedClients()) {
+    console.log('Clients connected, sending START_STREAM command to ESP32');
+    wsc.send('START_STREAM');
+  } else {
+    console.log('No clients connected, not starting camera stream');
+  }
 
   commandBus.subscribe((commands) => {
     // Forward commands to the ESP32

@@ -1,6 +1,7 @@
 #include "websocket_client.h"
 #include "commands.h"
 #include "motor.h"
+#include "camera_config.h"
 #include <Arduino.h>
 
 // Function to handle binary motor commands
@@ -166,9 +167,13 @@ void handle_binary_command(uint8_t *payload, size_t length)
 // Initialize static instance pointer for callback
 WebSocketClient *WebSocketClient::instance = nullptr;
 
+// Initialize static camera initialization failure counter and last attempt time
+int WebSocketClient::cameraInitFailCount = 0;
+unsigned long WebSocketClient::lastCameraInitAttempt = 0;
+
 WebSocketClient::WebSocketClient(const char *_host, uint16_t _port, const char *_path, bool _useTls)
     : host(_host), port(_port), path(_path), useTls(_useTls), connected(false),
-      lastFrameTime(0), lastHeartbeatTime(0), isStreaming(false)
+      lastFrameTime(0), lastHeartbeatTime(0), isStreaming(false), cameraInitialized(false)
 {
   // Set this instance as the singleton for callback
   instance = this;
@@ -224,6 +229,53 @@ void WebSocketClient::sendCameraFrame()
   // Limit frame rate
   if (millis() - lastFrameTime < 33)
     return; // 30 fps max
+    
+  // Check if camera is initialized
+  if (!cameraInitialized) {
+    Serial.println("Camera not initialized, initializing now");
+    
+      // Check if enough time has passed since the last attempt (3 seconds)
+      unsigned long currentTime = millis();
+      if (currentTime - lastCameraInitAttempt < 3000) {
+        Serial.println("Waiting before retrying camera initialization...");
+        return;
+      }
+      
+      // Reset failure counter if it's been more than 30 seconds since the last attempt
+      if (currentTime - lastCameraInitAttempt > 30000) {
+        cameraInitFailCount = 0;
+        Serial.println("Reset camera init failure counter due to timeout");
+      }
+      
+      lastCameraInitAttempt = currentTime;
+      
+      // Initialize camera
+      Serial.println("Attempting to initialize camera...");
+      esp_err_t err = init_camera();
+      if (err != ESP_OK) {
+        cameraInitFailCount++;
+        Serial.printf("Camera init failed with error 0x%x (failure count: %d)\n", err, cameraInitFailCount);
+        
+        // Reboot if camera initialization fails more than 5 times
+        if (cameraInitFailCount >= 5) {
+          Serial.println("Camera initialization failed 5 times, rebooting...");
+          delay(1000); // Give some time for the serial message to be sent
+          ESP.restart(); // Reboot the ESP32
+        }
+      return;
+    }
+    
+    cameraInitFailCount = 0; // Reset the failure counter on success
+    
+    cameraInitialized = true;
+    Serial.println("Camera initialized in sendCameraFrame");
+    
+    // Setup and turn on LED Flash if LED pin is defined
+    #if defined(LED_GPIO_NUM)
+      setupLedFlash(LED_GPIO_NUM);
+      turnOnLedFlash(LED_GPIO_NUM);
+    #endif
+  }
 
   // Get a frame from the camera
   camera_fb_t *fb = esp_camera_fb_get();
@@ -295,11 +347,70 @@ void WebSocketClient::handleWebSocketEvent(WStype_t type, uint8_t *payload, size
   case WStype_DISCONNECTED:
     Serial.println("WebSocket disconnected");
     connected = false;
+    
+    // Deinitialize camera and turn off LED when client disconnects
+    if (cameraInitialized) {
+      // Turn off LED flash
+      #if defined(LED_GPIO_NUM)
+        turnOffLedFlash(LED_GPIO_NUM);
+      #endif
+      
+      // Deinitialize camera
+      deinit_camera();
+      cameraInitialized = false;
+      Serial.println("Camera and LED turned off due to client disconnect");
+    }
+    
+    // Stop streaming
+    isStreaming = false;
     break;
 
   case WStype_CONNECTED:
     Serial.println("WebSocket connected");
     connected = true;
+    
+    // Initialize camera and LED when client connects
+    if (!cameraInitialized) {
+        // Check if enough time has passed since the last attempt (3 seconds)
+        unsigned long currentTime = millis();
+        if (currentTime - lastCameraInitAttempt < 3000) {
+          Serial.println("Waiting before retrying camera initialization...");
+          return;
+        }
+        
+        // Reset failure counter if it's been more than 30 seconds since the last attempt
+        if (currentTime - lastCameraInitAttempt > 30000) {
+          cameraInitFailCount = 0;
+          Serial.println("Reset camera init failure counter due to timeout");
+        }
+        
+        lastCameraInitAttempt = currentTime;
+        
+        // Initialize camera
+        Serial.println("Attempting to initialize camera...");
+        esp_err_t err = init_camera();
+        if (err != ESP_OK) {
+          cameraInitFailCount++;
+          Serial.printf("Camera init failed with error 0x%x (failure count: %d)\n", err, cameraInitFailCount);
+          
+          // Reboot if camera initialization fails more than 5 times
+          if (cameraInitFailCount >= 5) {
+            Serial.println("Camera initialization failed 5 times, rebooting...");
+            delay(1000); // Give some time for the serial message to be sent
+            ESP.restart(); // Reboot the ESP32
+          }
+      } else {
+        cameraInitialized = true;
+        cameraInitFailCount = 0; // Reset the failure counter on success
+        Serial.println("Camera initialized due to client connect");
+        
+        // Setup and turn on LED Flash if LED pin is defined
+        #if defined(LED_GPIO_NUM)
+          setupLedFlash(LED_GPIO_NUM);
+          turnOnLedFlash(LED_GPIO_NUM);
+        #endif
+      }
+    }
     break;
 
   case WStype_TEXT:
@@ -310,6 +421,55 @@ void WebSocketClient::handleWebSocketEvent(WStype_t type, uint8_t *payload, size
     // Handle commands
     if (strcmp((char *)payload, "START_STREAM") == 0)
     {
+      // Initialize camera if not already initialized
+      if (!cameraInitialized) {
+        // Check if enough time has passed since the last attempt (3 seconds)
+        unsigned long currentTime = millis();
+        if (currentTime - lastCameraInitAttempt < 3000) {
+          Serial.println("Waiting before retrying camera initialization...");
+          return;
+        }
+        
+        // Reset failure counter if it's been more than 30 seconds since the last attempt
+        if (currentTime - lastCameraInitAttempt > 30000) {
+          cameraInitFailCount = 0;
+          Serial.println("Reset camera init failure counter due to timeout");
+        }
+        
+        lastCameraInitAttempt = currentTime;
+        
+        // Initialize camera
+        Serial.println("Attempting to initialize camera...");
+        esp_err_t err = init_camera();
+        if (err != ESP_OK) {
+          cameraInitFailCount++;
+          Serial.printf("Camera init failed with error 0x%x (failure count: %d)\n", err, cameraInitFailCount);
+          
+          // Reboot if camera initialization fails more than 5 times
+          if (cameraInitFailCount >= 5) {
+            Serial.println("Camera initialization failed 5 times, rebooting...");
+            delay(1000); // Give some time for the serial message to be sent
+            ESP.restart(); // Reboot the ESP32
+          }
+        } else {
+          cameraInitialized = true;
+          cameraInitFailCount = 0; // Reset the failure counter on success
+          Serial.println("Camera initialized due to START_STREAM command");
+          
+          // Setup and turn on LED Flash if LED pin is defined
+          #if defined(LED_GPIO_NUM)
+            setupLedFlash(LED_GPIO_NUM);
+            turnOnLedFlash(LED_GPIO_NUM);
+          #endif
+        }
+      } else {
+        // Camera is already initialized, just turn on the LED
+        #if defined(LED_GPIO_NUM)
+          turnOnLedFlash(LED_GPIO_NUM);
+          Serial.println("LED turned on due to START_STREAM command");
+        #endif
+      }
+      
       isStreaming = true;
       Serial.println("Streaming started");
     }
@@ -317,6 +477,19 @@ void WebSocketClient::handleWebSocketEvent(WStype_t type, uint8_t *payload, size
     {
       isStreaming = false;
       Serial.println("Streaming stopped");
+      
+      // Deinitialize camera and turn off LED when streaming is stopped
+      if (cameraInitialized) {
+        // Turn off LED flash
+        #if defined(LED_GPIO_NUM)
+          turnOffLedFlash(LED_GPIO_NUM);
+        #endif
+        
+        // Deinitialize camera
+        deinit_camera();
+        cameraInitialized = false;
+        Serial.println("Camera and LED turned off due to STOP_STREAM command");
+      }
     }
     else
     {

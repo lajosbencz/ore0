@@ -10,6 +10,9 @@
 
 // Function declarations
 esp_err_t init_camera();
+void deinit_camera();
 void setupLedFlash(int pin);
+void turnOnLedFlash(int pin);
+void turnOffLedFlash(int pin);
 
 #endif // CAMERA_CONFIG_H

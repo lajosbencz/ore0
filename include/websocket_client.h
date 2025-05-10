@@ -17,12 +17,15 @@ private:
   unsigned long lastFrameTime;
   unsigned long lastHeartbeatTime;
   bool isStreaming;
+  bool cameraInitialized;
   
   // WebSocket event handler
   static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 
 public:
   static WebSocketClient* instance; // Singleton instance for callback
+  static int cameraInitFailCount; // Counter for camera initialization failures
+  static unsigned long lastCameraInitAttempt; // Timestamp of last camera init attempt
 
 public:
   WebSocketClient(const char* _host, uint16_t _port, const char* _path, bool _useTls = true);

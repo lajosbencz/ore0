@@ -29,17 +29,8 @@ void setup() {
     Serial.printf("Initialized GPIO pin %d as OUTPUT\n", pin);
   }
   
-  // Initialize camera
-  esp_err_t err = init_camera();
-  if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x", err);
-    return;
-  }
-  
-  // Setup LED Flash if LED pin is defined
-  #if defined(LED_GPIO_NUM)
-    setupLedFlash(LED_GPIO_NUM);
-  #endif
+  // Camera and LED will be initialized when a WebSocket client connects
+  Serial.println("Camera and LED will be initialized when a client connects");
   
   // Try to connect to WiFi
   bool wifiConnected = connectToWiFi();
