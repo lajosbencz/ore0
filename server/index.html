@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ORE0</title>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --danger-color: #f44336;
+            --dark-color: #333;
+            --light-color: #f0f0f0;
+            --control-size: 60px;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: white;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+        }
+        
+        .title {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .status-container {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .status {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .connected {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .disconnected {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .camera-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .camera {
+            position: absolute;
+            max-width: 100vh;
+            max-height: 100vw;
+        }
+        
+        .camera img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        /* Robot state visualization */
+        .robot-state {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 80px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 15;
+        }
+        
+        .robot-body {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .robot-track {
+            width: 20px;
+            height: 60px;
+            background-color: #555;
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .robot-track-animation {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                #555,
+                #555 5px,
+                #777 5px,
+                #777 10px
+            );
+            opacity: 0;
+        }
+        
+        .robot-track-animation.forward {
+            opacity: 1;
+            animation: track-forward 0.5s linear infinite;
+        }
+        
+        .robot-track-animation.backward {
+            opacity: 1;
+            animation: track-backward 0.5s linear infinite;
+        }
+        
+        .robot-track-animation.braking {
+            opacity: 1;
+            background: repeating-linear-gradient(
+                0deg,
+                #555,
+                #555 5px,
+                var(--danger-color) 5px,
+                var(--danger-color) 10px
+            );
+        }
+        
+        @keyframes track-forward {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+        
+        @keyframes track-backward {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+        
+        .robot-box {
+            width: 60px;
+            height: 40px;
+            background-color: #777;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: white;
+        }
+        
+        /* Portrait mode controls (desktop default) */
+        .controls-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 10;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        
+        .key {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #555;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background-color: rgba(50, 50, 50, 0.8);
+            color: white;
+            user-select: none;
+            touch-action: manipulation;
+            transition: all 0.1s ease;
+        }
+        
+        .key.active {
+            background-color: var(--primary-color);
+            transform: scale(0.95);
+        }
+        
+        .key-empty {
+            visibility: hidden;
+        }
+        
+        .key-space {
+            grid-column: 1 / span 3;
+            aspect-ratio: 3;
+        }
+        
+        /* Mobile landscape controls */
+        .mobile-controls-container {
+            display: none; /* Hidden by default, shown in landscape on mobile */
+        }
+        
+        .mobile-controls-left,
+        .mobile-controls-right {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 70px;
+        }
+        
+        .mobile-key {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #555;
+            border-radius: 10px;
+            font-size: 2rem;
+            font-weight: bold;
+            background-color: rgba(50, 50, 50, 0.8);
+            color: white;
+            user-select: none;
+            touch-action: manipulation;
+            transition: all 0.1s ease;
+            height: 70px;
+        }
+        
+        .mobile-key.active {
+            background-color: var(--primary-color);
+            transform: scale(0.95);
+        }
+        
+        .mobile-key-break {
+            margin-top: auto;
+        }
+        
+        .mobile-key-up {
+            color: var(--primary-color);
+        }
+        
+        .mobile-key-down {
+            color: var(--light-color);
+        }
+        
+        .mobile-key-stop {
+            color: var(--danger-color);
+        }
+        
+        .info-button {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: rgba(50, 50, 50, 0.8);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 20;
+            cursor: pointer;
+        }
+        
+        .instructions {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 30;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .instructions.show {
+            transform: translateY(0);
+        }
+        
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+        
+        .instructions ul {
+            list-style-type: none;
+            padding-left: 10px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        .instructions strong {
+            color: var(--primary-color);
+            display: inline-block;
+            width: 80px;
+            text-align: center;
+            margin-right: 10px;
+            padding: 3px;
+            border: 1px solid #555;
+            border-radius: 5px;
+        }
+        
+        .close-instructions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        
+        /* Media Queries */
+        @media (min-width: 768px) {
+            .header {
+                padding: 10px 20px;
+            }
+            
+            .title {
+                font-size: 1.5rem;
+            }
+            
+            .status {
+                font-size: 1rem;
+                padding: 5px 15px;
+            }
+            
+            .controls {
+                max-width: 350px;
+                gap: 15px;
+            }
+            
+            .key {
+                font-size: 1.5rem;
+            }
+            
+            .instructions strong {
+                width: 100px;
+            }
+            
+            .robot-state {
+                width: 120px;
+                height: 80px;
+                bottom: 100px;
+            }
+        }
+        
+        /* Mobile landscape layout */
+        @media (orientation: landscape) and (max-width: 2048px) {
+            .controls-container {
+                display: none; /* Hide desktop controls */
+            }
+            
+            .mobile-controls-container {
+                display: flex;
+                justify-content: space-between;
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                padding: 60px 10px 10px; /* Top padding for header */
+                z-index: 10;
+                pointer-events: none; /* Allow clicks to pass through to camera */
+            }
+            
+            .mobile-controls-left,
+            .mobile-controls-right {
+                pointer-events: auto; /* Re-enable clicks for controls */
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                gap: 20px;
+                width: 80px;
+            }
+            
+            .mobile-key {
+                height: 80px;
+                font-size: 2.5rem;
+            }
+            
+            .mobile-key-break {
+                margin-top: 20px;
+                background-color: rgba(50, 50, 50, 0.8);
+                font-size: 1.8rem;
+            }
+            
+            .robot-state {
+                bottom: 20px;
+            }
+        }
+        
+        /* Desktop landscape layout */
+        @media (orientation: landscape) and (min-width: 2049px) {
+            .controls-container {
+                right: auto;
+                top: 0;
+                bottom: 0;
+                display: flex;
+                align-items: center;
+                width: auto;
+            }
+            
+            .controls {
+                grid-template-columns: repeat(3, 1fr);
+                grid-template-rows: repeat(3, 1fr);
+                max-width: 150px;
+            }
+            
+            .key-space {
+                grid-column: 1 / span 2;
+                aspect-ratio: 2;
+            }
+            
+            .robot-state {
+                right: 20px;
+                left: auto;
+                transform: none;
+                bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">ORE0 Controller</div>
+        <div class="status-container">
+            <div id="status" class="status disconnected">Disconnected</div>
+            <div id="status-oreo" class="status disconnected">Offline</div>
+        </div>
+    </div>
+    
+    <div class="camera-container">
+        <div id="camera" class="camera"></div>
+    </div>
+    
+    <!-- Robot State Visualization -->
+    <div class="robot-state">
+        <div class="robot-body">
+            <div class="robot-track" id="left-track">
+                <div class="robot-track-animation" id="left-track-animation"></div>
+            </div>
+            <div class="robot-box">ORE0</div>
+            <div class="robot-track" id="right-track">
+                <div class="robot-track-animation" id="right-track-animation"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Desktop/Portrait Controls -->
+    <div class="controls-container">
+        <div class="controls">
+            <div id="key-q" class="key" data-key="q">Q</div>
+            <div id="key-w" class="key" data-key="w">W</div>
+            <div id="key-e" class="key" data-key="e">E</div>
+            <div id="key-a" class="key" data-key="a">A</div>
+            <div id="key-s" class="key" data-key="s">S</div>
+            <div id="key-d" class="key" data-key="d">D</div>
+            <div class="key-empty"></div>
+            <div id="key-space" class="key key-space" data-key=" ">STOP</div>
+        </div>
+    </div>
+    
+    <!-- Mobile Landscape Controls -->
+    <div class="mobile-controls-container">
+        <div class="mobile-controls-left">
+            <div id="mobile-key-q" class="mobile-key mobile-key-up" data-key="q">↑</div>
+            <div id="mobile-key-a" class="mobile-key mobile-key-down" data-key="a">↓</div>
+            <div id="mobile-key-space-left" class="mobile-key mobile-key-break mobile-key-stop" data-key=" ">■</div>
+        </div>
+        <div class="mobile-controls-right">
+            <div id="mobile-key-e" class="mobile-key mobile-key-up" data-key="e">↑</div>
+            <div id="mobile-key-d" class="mobile-key mobile-key-down" data-key="d">↓</div>
+            <div id="mobile-key-space-right" class="mobile-key mobile-key-break mobile-key-stop" data-key=" ">■</div>
+        </div>
+    </div>
+    
+    <div class="info-button" id="info-button">i</div>
+    
+    <div class="instructions" id="instructions">
+        <button class="close-instructions" id="close-instructions">×</button>
+        <h3>Controls:</h3>
+        <ul>
+            <li><strong>Q</strong> Left motor forward</li>
+            <li><strong>W</strong> Both motors forward</li>
+            <li><strong>E</strong> Right motor forward</li>
+            <li><strong>A</strong> Left motor backward</li>
+            <li><strong>S</strong> Both motors backward</li>
+            <li><strong>D</strong> Right motor backward</li>
+            <li><strong>STOP</strong> Emergency brake</li>
+        </ul>
+        <p style="margin-top: 20px;">Use keyboard on desktop or touch controls on mobile.</p>
+        <p>On mobile in landscape mode, use thumbs on both sides of the screen.</p>
+    </div>
+
+<script>
+  const Commands = {
+    // Left Motor Commands
+    LM_FORWARD: 0x01,
+    LM_BACKWARD: 0x02,
+    LM_STOP: 0x03,
+    LM_BREAK: 0x04,
+
+    // Right Motor Commands
+    RM_FORWARD: 0x05,
+    RM_BACKWARD: 0x06,
+    RM_STOP: 0x07,
+    RM_BREAK: 0x08,
+
+    // Combined Commands
+    ALL_STOP: 0x09,
+    ALL_BREAK: 0x0A
+  };
+
+  const keyMap = {
+    'q': { press: [Commands.LM_FORWARD], release: [Commands.LM_STOP] },
+    'a': { press: [Commands.LM_BACKWARD], release: [Commands.LM_STOP] },
+    'e': { press: [Commands.RM_FORWARD], release: [Commands.RM_STOP] },
+    'd': { press: [Commands.RM_BACKWARD], release: [Commands.RM_STOP] },
+    'w': {
+      press: [Commands.LM_FORWARD, Commands.RM_FORWARD],
+      release: [Commands.LM_STOP, Commands.RM_STOP]
+    },
+    's': {
+      press: [Commands.LM_BACKWARD, Commands.RM_BACKWARD],
+      release: [Commands.LM_STOP, Commands.RM_STOP]
+    },
+    ' ': {  // Space bar for emergency break
+      press: [Commands.ALL_BREAK],
+      release: [Commands.ALL_STOP]
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const statusElement = document.getElementById('status');
+    const statusOreoElement = document.getElementById('status-oreo');
+    const cameraElement = document.getElementById('camera');
+    const infoButton = document.getElementById('info-button');
+    const instructions = document.getElementById('instructions');
+    const closeInstructions = document.getElementById('close-instructions');
+    const keys = document.querySelectorAll('.key[data-key], .mobile-key[data-key]');
+    
+    // Robot state visualization elements
+    const leftTrackAnimation = document.getElementById('left-track-animation');
+    const rightTrackAnimation = document.getElementById('right-track-animation');
+
+    // Instructions toggle
+    infoButton.addEventListener('click', function() {
+      instructions.classList.add('show');
+    });
+
+    closeInstructions.addEventListener('click', function() {
+      instructions.classList.remove('show');
+    });
+
+    // Camera setup
+    const img = new Image();
+    img.onload = function() {
+      // Adjust camera container based on image dimensions
+      const imgAspectRatio = img.width / img.height;
+      const windowAspectRatio = window.innerWidth / window.innerHeight;
+      
+      // Set camera dimensions to maximize the view while maintaining aspect ratio
+      if (imgAspectRatio > windowAspectRatio) {
+        // Height constrained
+        cameraElement.style.width = `${img.height}px`;
+        cameraElement.style.height = `${img.width}px`;
+      } else {
+        // Width constrained
+        cameraElement.style.width = `${img.height}px`;
+        cameraElement.style.height = `${img.width}px`;
+      }
+    };
+    cameraElement.appendChild(img);
+    
+    // WebSocket connection
+    const socket = new WebSocket('/ws');
+
+    // Track currently pressed keys to avoid duplicate commands
+    const activeKeys = new Set();
+
+    // WebSocket event handlers
+    socket.onopen = function() {
+      statusElement.textContent = 'Connected';
+      statusElement.className = 'status connected';
+      console.log('WebSocket connection established');
+    };
+
+    let imageUrl = null;
+
+    socket.onmessage = function(event) {
+      if (event.data instanceof Blob) {
+        // binary data received from the server, contains jpeg image.
+        if(imageUrl) {
+          URL.revokeObjectURL(imageUrl);
+        }
+        const image = new Blob([event.data], { type: 'image/jpeg' });
+        imageUrl = URL.createObjectURL(image);
+        img.src = imageUrl;
+      } else {
+        console.log('Received message:', event.data);
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'status') {
+          statusOreoElement.textContent = msg.online ? 'Online' : 'Offline';
+          statusOreoElement.className = msg.online ? 'status connected' : 'status disconnected';
+          
+          // Update robot state visualization
+          updateTrackAnimation(leftTrackAnimation, msg.left);
+          updateTrackAnimation(rightTrackAnimation, msg.right);
+        }
+      }
+    };
+
+    // Update track animation based on motor state
+    function updateTrackAnimation(trackElement, state) {
+      // Remove all classes first
+      trackElement.classList.remove('forward', 'backward', 'braking');
+      
+      // Add appropriate class based on state
+      switch(state) {
+        case 'FORWARD':
+          trackElement.classList.add('forward');
+          break;
+        case 'BACKWARD':
+          trackElement.classList.add('backward');
+          break;
+        case 'BRAKING':
+          trackElement.classList.add('braking');
+          break;
+        case 'STOPPED':
+        default:
+          // No class needed for stopped state
+          break;
+      }
+    }
+
+    socket.onclose = function() {
+      statusElement.textContent = 'Disconnected';
+      statusElement.className = 'status disconnected';
+      console.log('WebSocket connection closed');
+    };
+
+    socket.onerror = function(error) {
+      console.error('WebSocket error:', error);
+      statusElement.textContent = 'Error';
+      statusElement.className = 'status disconnected';
+    };
+
+    // Keyboard event handlers
+    document.addEventListener('keydown', function(event) {
+      const key = event.key.toLowerCase();
+      if (keyMap.hasOwnProperty(key) && !activeKeys.has(key)) {
+        event.preventDefault();
+        activeKeys.add(key);
+        highlightKey(key, true);
+        sendCommands(keyMap[key].press);
+      }
+    });
+
+    document.addEventListener('keyup', function(event) {
+      const key = event.key.toLowerCase();
+      if (keyMap.hasOwnProperty(key)) {
+        event.preventDefault();
+        activeKeys.delete(key);
+        highlightKey(key, false);
+        sendCommands(keyMap[key].release);
+      }
+    });
+
+    // Touch and mouse event handlers for all keys
+    keys.forEach(key => {
+      const keyValue = key.getAttribute('data-key');
+      
+      // Touch start (press)
+      key.addEventListener('touchstart', function(e) {
+        e.preventDefault(); // Prevent default touch behavior
+        if (!activeKeys.has(keyValue)) {
+          activeKeys.add(keyValue);
+          highlightKey(keyValue, true);
+          sendCommands(keyMap[keyValue].press);
+        }
+      });
+      
+      // Touch end (release)
+      key.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        if (activeKeys.has(keyValue)) {
+          activeKeys.delete(keyValue);
+          highlightKey(keyValue, false);
+          sendCommands(keyMap[keyValue].release);
+        }
+      });
+      
+      // Touch cancel (release)
+      key.addEventListener('touchcancel', function(e) {
+        e.preventDefault();
+        if (activeKeys.has(keyValue)) {
+          activeKeys.delete(keyValue);
+          highlightKey(keyValue, false);
+          sendCommands(keyMap[keyValue].release);
+        }
+      });
+      
+      // Mouse events for desktop
+      key.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        if (!activeKeys.has(keyValue)) {
+          activeKeys.add(keyValue);
+          highlightKey(keyValue, true);
+          sendCommands(keyMap[keyValue].press);
+        }
+      });
+      
+      key.addEventListener('mouseup', function(e) {
+        e.preventDefault();
+        if (activeKeys.has(keyValue)) {
+          activeKeys.delete(keyValue);
+          highlightKey(keyValue, false);
+          sendCommands(keyMap[keyValue].release);
+        }
+      });
+      
+      key.addEventListener('mouseleave', function(e) {
+        e.preventDefault();
+        if (activeKeys.has(keyValue)) {
+          activeKeys.delete(keyValue);
+          highlightKey(keyValue, false);
+          sendCommands(keyMap[keyValue].release);
+        }
+      });
+    });
+
+    // Handle window resize to adjust camera size
+    window.addEventListener('resize', function() {
+      if (img.complete) {
+        const imgAspectRatio = img.height / img.width;
+        const windowAspectRatio = window.innerWidth / window.innerHeight;
+        
+        if (imgAspectRatio > windowAspectRatio) {
+          cameraElement.style.width = `${img.height}px`;
+          cameraElement.style.height = `${img.width}px`;
+        } else {
+          cameraElement.style.width = `${img.height}px`;
+          cameraElement.style.height = `${img.width}px`;
+        }
+      }
+    });
+
+    // Helper functions
+    function highlightKey(key, isActive) {
+      const keyId = key === ' ' ? 'space' : key;
+      
+      // Highlight both desktop and mobile keys
+      const keyElement = document.getElementById(`key-${keyId}`);
+      if (keyElement) {
+        keyElement.classList.toggle('active', isActive);
+      }
+      
+      // For mobile keys
+      const mobileKeyElement = document.getElementById(`mobile-key-${keyId}`);
+      if (mobileKeyElement) {
+        mobileKeyElement.classList.toggle('active', isActive);
+      }
+      
+      // For space key on mobile (left and right)
+      if (key === ' ') {
+        const spaceLeftElement = document.getElementById('mobile-key-space-left');
+        const spaceRightElement = document.getElementById('mobile-key-space-right');
+        
+        if (spaceLeftElement) {
+          spaceLeftElement.classList.toggle('active', isActive);
+        }
+        
+        if (spaceRightElement) {
+          spaceRightElement.classList.toggle('active', isActive);
+        }
+      }
+    }
+
+    function sendCommands(commands) {
+      if (socket.readyState === WebSocket.OPEN) {
+        const data = new Uint8Array(commands);
+        socket.send(data);
+        console.log(`Sent command: ${data}`);
+      } else {
+        console.warn('WebSocket not connected. Commands not sent:', commands);
+      }
+    }
+    
+    // Prevent zooming on double tap for mobile devices
+    document.addEventListener('touchmove', function(e) {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+  });
+</script>
+</body>
+</html>
