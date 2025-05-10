@@ -6,6 +6,8 @@
 void handle_binary_command(uint8_t *payload, size_t length)
 {
   if (length < 1) return;
+  // print the command type
+  Serial.printf("Received command type: %02X\n", payload[0]);
   
   uint8_t cmd = payload[0];
   
@@ -83,12 +85,6 @@ void handle_binary_command(uint8_t *payload, size_t length)
         response.m1p2 = config.m1p2;
         response.m2p1 = config.m2p1;
         response.m2p2 = config.m2p2;
-        
-        // Send the response back through the WebSocket
-        if (WebSocketClient::instance)
-        {
-          WebSocketClient::instance->sendBinaryData((uint8_t *)&response, sizeof(response));
-        }
       }
       break;
   }
@@ -165,7 +161,7 @@ void WebSocketClient::sendCameraFrame()
   }
 
   // Send image data as binary
-  webSocket.sendBIN(fb->buf, fb->len);
+  sendBinaryData(fb->buf, fb->len);
 
   static uint8_t frameCount = 0;
   frameCount++;
@@ -240,29 +236,28 @@ void WebSocketClient::handleWebSocketEvent(WStype_t type, uint8_t *payload, size
       isStreaming = false;
       Serial.println("Streaming stopped");
     }
-    // handle other commands, base on commands.h
     else
     {
       Serial.printf("Unknown text command: %s\n", (char *)payload);
-      break;
-
-    case WStype_BIN:
-      Serial.printf("Received binary data of length %d\n", length);
-      handle_binary_command(payload, length);
-      break;
-
-    case WStype_PING:
-      // Handled automatically by the library
-      Serial.println("Received ping");
-      break;
-
-    case WStype_PONG:
-      Serial.println("Received pong");
-      break;
-
-    case WStype_ERROR:
-      Serial.println("WebSocket error");
-      break;
     }
+    break;
+
+  case WStype_BIN:
+    Serial.printf("Received binary data of length %d\n", length);
+    handle_binary_command(payload, length);
+    break;
+
+  case WStype_PING:
+    // Handled automatically by the library
+    Serial.println("Received ping");
+    break;
+
+  case WStype_PONG:
+    Serial.println("Received pong");
+    break;
+
+  case WStype_ERROR:
+    Serial.println("WebSocket error");
+    break;
   }
 }

@@ -547,40 +547,60 @@
     </div>
 
 <script>
+  // Command types from commands.h
   const Commands = {
-    // Left Motor Commands
-    LM_FORWARD: 0x01,
-    LM_BACKWARD: 0x02,
-    LM_STOP: 0x03,
-    LM_BREAK: 0x04,
-
-    // Right Motor Commands
-    RM_FORWARD: 0x05,
-    RM_BACKWARD: 0x06,
-    RM_STOP: 0x07,
-    RM_BREAK: 0x08,
-
-    // Combined Commands
-    ALL_STOP: 0x09,
-    ALL_BREAK: 0x0A
+    // Motor control commands
+    CMD_MOTOR_CONTROL: 0x10,   // Command to control motors
+    
+    // Motor pin configuration commands
+    CMD_SET_MOTOR_PINS: 0x20,  // Command to set motor pins
+    CMD_GET_MOTOR_PINS: 0x21   // Command to get current motor pin configuration
   };
 
+  // Motor selection values
+  const Motor = {
+    LEFT: 0,  // MOTOR_CMD_LEFT
+    RIGHT: 1, // MOTOR_CMD_RIGHT
+    BOTH: 2   // MOTOR_CMD_BOTH
+  };
+
+  // Motor direction values
+  const MotorDirection = {
+    STOP: 0,     // MOTOR_CMD_STOP
+    FORWARD: 1,  // MOTOR_CMD_FORWARD
+    BACKWARD: 2, // MOTOR_CMD_BACKWARD
+    BRAKE: 3     // MOTOR_CMD_BRAKE
+  };
+
+  // Define key mappings for structured commands only
   const keyMap = {
-    'q': { press: [Commands.LM_FORWARD], release: [Commands.LM_STOP] },
-    'a': { press: [Commands.LM_BACKWARD], release: [Commands.LM_STOP] },
-    'e': { press: [Commands.RM_FORWARD], release: [Commands.RM_STOP] },
-    'd': { press: [Commands.RM_BACKWARD], release: [Commands.RM_STOP] },
+    'q': { 
+      press: [Commands.CMD_MOTOR_CONTROL, Motor.LEFT, MotorDirection.FORWARD], 
+      release: [Commands.CMD_MOTOR_CONTROL, Motor.LEFT, MotorDirection.STOP]
+    },
+    'a': { 
+      press: [Commands.CMD_MOTOR_CONTROL, Motor.LEFT, MotorDirection.BACKWARD], 
+      release: [Commands.CMD_MOTOR_CONTROL, Motor.LEFT, MotorDirection.STOP]
+    },
+    'e': { 
+      press: [Commands.CMD_MOTOR_CONTROL, Motor.RIGHT, MotorDirection.FORWARD], 
+      release: [Commands.CMD_MOTOR_CONTROL, Motor.RIGHT, MotorDirection.STOP]
+    },
+    'd': { 
+      press: [Commands.CMD_MOTOR_CONTROL, Motor.RIGHT, MotorDirection.BACKWARD], 
+      release: [Commands.CMD_MOTOR_CONTROL, Motor.RIGHT, MotorDirection.STOP]
+    },
     'w': {
-      press: [Commands.LM_FORWARD, Commands.RM_FORWARD],
-      release: [Commands.LM_STOP, Commands.RM_STOP]
+      press: [Commands.CMD_MOTOR_CONTROL, Motor.BOTH, MotorDirection.FORWARD],
+      release: [Commands.CMD_MOTOR_CONTROL, Motor.BOTH, MotorDirection.STOP]
     },
     's': {
-      press: [Commands.LM_BACKWARD, Commands.RM_BACKWARD],
-      release: [Commands.LM_STOP, Commands.RM_STOP]
+      press: [Commands.CMD_MOTOR_CONTROL, Motor.BOTH, MotorDirection.BACKWARD],
+      release: [Commands.CMD_MOTOR_CONTROL, Motor.BOTH, MotorDirection.STOP]
     },
     ' ': {  // Space bar for emergency break
-      press: [Commands.ALL_BREAK],
-      release: [Commands.ALL_STOP]
+      press: [Commands.CMD_MOTOR_CONTROL, Motor.BOTH, MotorDirection.BRAKE],
+      release: [Commands.CMD_MOTOR_CONTROL, Motor.BOTH, MotorDirection.STOP]
     }
   };
 
@@ -834,7 +854,7 @@
       if (socket.readyState === WebSocket.OPEN) {
         const data = new Uint8Array(commands);
         socket.send(data);
-        console.log(`Sent command: ${data}`);
+        console.log(`Sent command: ${Array.from(data).map(c => '0x' + c.toString(16)).join(',')}`);
       } else {
         console.warn('WebSocket not connected. Commands not sent:', commands);
       }

@@ -4,24 +4,30 @@ const {readFileSync} = require('fs');
 const {parse} = require('url');
 const {on} = require('events');
 
+// Command types from commands.h
 const Commands = {
-  0x01: 'LM_FORWARD',
-  0x02: 'LM_BACKWARD',
-  0x03: 'LM_STOP',
-  0x04: 'LM_BREAK',
-  0x05: 'RM_FORWARD',
-  0x06: 'RM_BACKWARD',
-  0x07: 'RM_STOP',
-  0x08: 'RM_BREAK',
-  0x09: 'ALL_STOP',
-  0x0A: 'ALL_BREAK',
-  0x10: 'MOTOR_CONTROL',
-  0x20: 'SET_MOTOR_PINS',
-  0x21: 'GET_MOTOR_PINS',
+  // Motor control commands
+  CMD_MOTOR_CONTROL: 0x10,   // Command to control motors
+  
+  // Motor pin configuration commands
+  CMD_SET_MOTOR_PINS: 0x20,  // Command to set motor pins
+  CMD_GET_MOTOR_PINS: 0x21   // Command to get current motor pin configuration
 };
 
-const Motor = {LEFT: 0, RIGHT: 1, BOTH: 2};
-const MotorDirection = {STOP: 0, FORWARD: 1, BACKWARD: 2, BRAKE: 3};
+// Motor selection values
+const Motor = {
+  LEFT: 0,  // MOTOR_CMD_LEFT
+  RIGHT: 1, // MOTOR_CMD_RIGHT
+  BOTH: 2   // MOTOR_CMD_BOTH
+};
+
+// Motor direction values
+const MotorDirection = {
+  STOP: 0,     // MOTOR_CMD_STOP
+  FORWARD: 1,  // MOTOR_CMD_FORWARD
+  BACKWARD: 2, // MOTOR_CMD_BACKWARD
+  BRAKE: 3     // MOTOR_CMD_BRAKE
+};
 
 
 const server = http.createServer();
@@ -67,54 +73,49 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (data) => {
     const commands = new Uint8Array(data);
-    console.log(`Received commands: ${commands}`);
-    for (const cmd of commands) {
-      const cmdName = Commands[cmd] || 'UNKNOWN';
-      // Handle motor control
-      switch (cmd) {
-        // Left Motor Commands
-        case 0x01:
-          motorStates.left = 'FORWARD';
-          break;
-        case 0x02:
-          motorStates.left = 'BACKWARD';
-          break;
-        case 0x03:
-          motorStates.left = 'STOPPED';
-          break;
-        case 0x04:
-          motorStates.left = 'BRAKING';
-          break;
-
-        // Right Motor Commands
-        case 0x05:
-          motorStates.right = 'FORWARD';
-          break;
-        case 0x06:
-          motorStates.right = 'BACKWARD';
-          break;
-        case 0x07:
-          motorStates.right = 'STOPPED';
-          break;
-        case 0x08:
-          motorStates.right = 'BRAKING';
-          break;
-
-        // Combined Commands
-        case 0x09:
-          motorStates.left = 'STOPPED';
-          motorStates.right = 'STOPPED';
-          break;
-        case 0x0A:
-          motorStates.left = 'BRAKING';
-          motorStates.right = 'BRAKING';
-          break;
-        default:
-          console.log(`Unknown command: ${cmdName} (${cmd})`);
-          return;
+    console.log(`Received commands: ${Array.from(commands).map(c => '0x' + c.toString(16)).join(',')}`);
+    
+    // Handle structured commands
+    if (commands.length >= 3 && commands[0] === Commands.CMD_MOTOR_CONTROL) {
+      // Parse motor control command
+      const motorCmd = {
+        command: commands[0],  // CMD_MOTOR_CONTROL
+        motor: commands[1],    // MOTOR_CMD_LEFT, MOTOR_CMD_RIGHT, or MOTOR_CMD_BOTH
+        direction: commands[2] // MOTOR_CMD_STOP, MOTOR_CMD_FORWARD, MOTOR_CMD_BACKWARD, or MOTOR_CMD_BRAKE
+      };
+      
+      // Update motor states based on the command
+      const updateMotorState = (motorType, direction) => {
+        const state = direction === MotorDirection.STOP ? 'STOPPED' :
+                     direction === MotorDirection.FORWARD ? 'FORWARD' :
+                     direction === MotorDirection.BACKWARD ? 'BACKWARD' :
+                     direction === MotorDirection.BRAKE ? 'BRAKING' : 'UNKNOWN';
+        
+        if (motorType === Motor.LEFT || motorType === Motor.BOTH) {
+          motorStates.left = state;
+        }
+        if (motorType === Motor.RIGHT || motorType === Motor.BOTH) {
+          motorStates.right = state;
+        }
+      };
+      
+      updateMotorState(motorCmd.motor, motorCmd.direction);
+      
+      // Forward the structured command to ESP32
+      if (oreoClient && oreoClient.readyState === WebSocket.OPEN) {
+        commandBus.publish(commands);
       }
     }
-    commandBus.publish(commands);
+    else if (commands.length >= 1) {
+      // Other command types can be handled here
+      console.log(`Received command type: 0x${commands[0].toString(16)}`);
+      
+      // Forward all other commands to ESP32
+      if (oreoClient && oreoClient.readyState === WebSocket.OPEN) {
+        commandBus.publish(commands);
+      }
+    }
+    
     console.log(`Motor States: Left=${motorStates.left}, Right=${motorStates.right}`);
   });
 
@@ -143,10 +144,9 @@ wssc.on('connection', (wsc) => {
   oreoClient = wsc;
 
   commandBus.subscribe((commands) => {
-    // convert commands (Uint8Array) to comma-separated string
-    const state = Array.from(commands).join(',');
-    console.log(`Sending commands: ${state}`);
-    wsc.send(state);
+    // Forward commands to the ESP32
+    console.log(`Sending commands to ESP32: ${Array.from(commands).map(c => '0x' + c.toString(16)).join(',')}`);
+    wsc.send(commands);
   });
 
   // receive binary data
