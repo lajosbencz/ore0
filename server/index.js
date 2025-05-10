@@ -73,6 +73,7 @@ const commandBus = {
 };
 
 let oreoClient = null;
+let lastOreoMessageTime = 0; // Track the last time a message was received from ORE0
 const clients = [];
 
 wss.on('connection', (ws) => {
@@ -128,9 +129,14 @@ wss.on('connection', (ws) => {
   });
 
   let statusInterval = setInterval(() => {
+    // Consider ORE0 offline if no messages received in the last 5 seconds
+    const currentTime = Date.now();
+    const isOnline = oreoClient?.readyState === WebSocket.OPEN && 
+                     (currentTime - lastOreoMessageTime < 5000);
+    
     const status = JSON.stringify({
       type: 'status',
-      online: oreoClient?.readyState === WebSocket.OPEN,
+      online: isOnline,
       left: motorStates.left,
       right: motorStates.right
     });
@@ -150,6 +156,7 @@ const wssc = new WebSocket.Server({noServer: true});
 wssc.on('connection', (wsc) => {
   console.log('ORE0 connected');
   oreoClient = wsc;
+  lastOreoMessageTime = Date.now(); // Initialize the last message time
 
   // Send START_STREAM command to ESP32 when it connects
   console.log('Sending START_STREAM command to ESP32');
@@ -171,6 +178,8 @@ wssc.on('connection', (wsc) => {
 
   // receive binary data
   wsc.on('message', (data) => {
+    // Update the last message time whenever any message is received
+    lastOreoMessageTime = Date.now();
     // Check if data is a command or a camera frame
     if (data instanceof Buffer && data.length > 1000) {
       // Likely a camera frame (JPEG images are typically larger than commands)
@@ -232,6 +241,7 @@ wssc.on('connection', (wsc) => {
   wsc.on('close', () => {
     commandBus.listeners.splice(0, commandBus.length);
     oreoClient = null;
+    lastOreoMessageTime = 0; // Reset the last message time
     console.log('ORE0 disconnected');
   });
 });

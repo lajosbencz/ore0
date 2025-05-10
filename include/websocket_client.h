@@ -15,6 +15,7 @@ private:
   bool useTls;
   bool connected;
   unsigned long lastFrameTime;
+  unsigned long lastHeartbeatTime;
   bool isStreaming;
   
   // WebSocket event handler

@@ -168,7 +168,7 @@ WebSocketClient *WebSocketClient::instance = nullptr;
 
 WebSocketClient::WebSocketClient(const char *_host, uint16_t _port, const char *_path, bool _useTls)
     : host(_host), port(_port), path(_path), useTls(_useTls), connected(false),
-      lastFrameTime(0), isStreaming(false)
+      lastFrameTime(0), lastHeartbeatTime(0), isStreaming(false)
 {
   // Set this instance as the singleton for callback
   instance = this;
@@ -266,6 +266,15 @@ void WebSocketClient::update()
   if (connected && isStreaming)
   {
     sendCameraFrame();
+  }
+  
+  // Send heartbeat message every 3 seconds
+  unsigned long currentTime = millis();
+  if (connected && (currentTime - lastHeartbeatTime > 3000))
+  {
+    webSocket.sendTXT("HEARTBEAT");
+    lastHeartbeatTime = currentTime;
+    Serial.println("Sent heartbeat");
   }
 }
 
