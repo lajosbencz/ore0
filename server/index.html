@@ -516,6 +516,9 @@
                 <div class="robot-track-animation" id="right-track-animation"></div>
             </div>
         </div>
+        <div id="distance-indicator" style="margin-top: 5px; font-size: 0.8rem; text-align: center;">
+            Distance: -- cm
+        </div>
     </div>
     
     <!-- Desktop/Portrait Controls -->
@@ -680,6 +683,9 @@
 
     let imageUrl = null;
 
+    // Distance indicator element
+    const distanceIndicator = document.getElementById('distance-indicator');
+
     socket.onmessage = function(event) {
       if (event.data instanceof Blob) {
         // binary data received from the server, contains jpeg image.
@@ -699,6 +705,25 @@
           // Update robot state visualization
           updateTrackAnimation(leftTrackAnimation, msg.left);
           updateTrackAnimation(rightTrackAnimation, msg.right);
+          
+          // Update distance indicator if distance data is available
+          if (msg.hasOwnProperty('distance')) {
+            if (msg.distance < 0) {
+              distanceIndicator.textContent = 'Distance: Error';
+              distanceIndicator.style.color = 'var(--danger-color)';
+            } else {
+              distanceIndicator.textContent = `Distance: ${msg.distance.toFixed(1)} cm`;
+              
+              // Change color based on distance (red when close, green when far)
+              if (msg.distance < 20) {
+                distanceIndicator.style.color = 'var(--danger-color)';
+              } else if (msg.distance < 50) {
+                distanceIndicator.style.color = 'orange';
+              } else {
+                distanceIndicator.style.color = 'var(--primary-color)';
+              }
+            }
+          }
         }
       }
     };

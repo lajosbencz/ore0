@@ -48,6 +48,9 @@ public:
   // Update method (to be called in loop)
   void update();
   
+  // Send heartbeat with distance data
+  void sendHeartbeatWithDistance(float distance);
+  
   // Event handling
   void handleWebSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 };

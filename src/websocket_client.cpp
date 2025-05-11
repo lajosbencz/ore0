@@ -2,6 +2,7 @@
 #include "commands.h"
 #include "motor.h"
 #include "camera_config.h"
+#include "ultrasonic.h"
 #include <Arduino.h>
 
 // Function to handle binary motor commands
@@ -320,14 +321,40 @@ void WebSocketClient::update()
     sendCameraFrame();
   }
   
-  // Send heartbeat message every 3 seconds
+  // Send heartbeat message with distance data every 3 seconds
   unsigned long currentTime = millis();
   if (connected && (currentTime - lastHeartbeatTime > 3000))
   {
-    webSocket.sendTXT("HEARTBEAT");
+    // Get distance from ultrasonic sensor
+    float distance = ultrasonic_measure_distance();
+    
+    // Send heartbeat with distance data
+    sendHeartbeatWithDistance(distance);
+    
     lastHeartbeatTime = currentTime;
-    Serial.println("Sent heartbeat");
   }
+}
+
+// Send heartbeat with distance data
+void WebSocketClient::sendHeartbeatWithDistance(float distance) {
+  if (!connected)
+    return;
+    
+  // Create a JSON string with the distance data
+  char jsonBuffer[100];
+  
+  if (distance < 0) {
+    // Error reading distance
+    snprintf(jsonBuffer, sizeof(jsonBuffer), "{\"type\":\"status\",\"online\":true,\"distance\":-1,\"error\":\"sensor_error\"}");
+  } else {
+    // Valid distance reading
+    snprintf(jsonBuffer, sizeof(jsonBuffer), "{\"type\":\"status\",\"online\":true,\"distance\":%.2f}", distance);
+  }
+  
+  // Send the JSON string as text
+  webSocket.sendTXT(jsonBuffer);
+  
+  Serial.printf("Sent heartbeat with distance: %.2f cm\n", distance);
 }
 
 // Static event handler that forwards to the instance method

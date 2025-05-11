@@ -208,12 +208,44 @@ wssc.on('connection', (wsc) => {
     m2p2: 14
   };
 
-  // receive binary data
+  // Track distance measurement from ultrasonic sensor
+  let distance = -1;
+
+  // receive binary data or text messages
   wsc.on('message', (data) => {
     // Update the last message time whenever any message is received
     lastOreoMessageTime = Date.now();
+    
+    // Check if data is a text message (JSON)
+    if (typeof data === 'string') {
+      try {
+        const jsonData = JSON.parse(data);
+        console.log(`Received JSON data from ESP32:`, jsonData);
+        
+        // Handle status message with distance data
+        if (jsonData.type === 'status' && jsonData.hasOwnProperty('distance')) {
+          distance = jsonData.distance;
+          console.log(`Updated distance measurement: ${distance} cm`);
+          
+          // Forward the status message to all clients
+          clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              // Add motor states to the status message
+              const statusMsg = JSON.stringify({
+                ...jsonData,
+                left: motorStates.left,
+                right: motorStates.right
+              });
+              client.send(statusMsg);
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Error parsing JSON message:', e);
+      }
+    }
     // Check if data is a command or a camera frame
-    if (data instanceof Buffer && data.length > 1000) {
+    else if (data instanceof Buffer && data.length > 1000) {
       // Likely a camera frame (JPEG images are typically larger than commands)
       console.log(`Received camera frame: ${data.length} bytes`);
       

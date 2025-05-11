@@ -3,6 +3,7 @@
 #include "wifi_manager.h"
 #include "websocket_client.h"
 #include "motor.h"
+#include "ultrasonic.h"
 
 // Global objects
 WebSocketClient* wsClient = nullptr;
@@ -20,6 +21,9 @@ void setup() {
   // Initialize motors with default pins
   // Motor pin configuration can be changed via WebSocket commands
   motor_init(DEFAULT_M1P1, DEFAULT_M1P2, DEFAULT_M2P1, DEFAULT_M2P2);
+  
+  // Initialize ultrasonic sensor
+  ultrasonic_init();
   
   // Initialize GPIO pins 12-15 as outputs
   // These pins are also used for motors by default, but can be controlled directly via GPIO commands
