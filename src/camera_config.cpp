@@ -93,7 +93,7 @@ void turnOnLedFlash(int pin) {
 #if defined(LED_GPIO_NUM)
   #if CONFIG_LED_ILLUMINATOR_ENABLED
     // Set LED brightness to maximum (255)
-    ledcWrite(1, 140);
+    ledcWrite(1, 80);
     Serial.println("LED flash turned on");
   #endif
 #endif

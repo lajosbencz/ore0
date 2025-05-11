@@ -238,76 +238,6 @@
         .tab-content.active {
             display: block;
         }
-        
-        /* GPIO control styles */
-        .gpio-controls {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-top: 20px;
-        }
-        
-        .gpio-control {
-            background-color: #333;
-            padding: 15px;
-            border-radius: 5px;
-            text-align: center;
-        }
-        
-        .gpio-label {
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-        
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #555;
-            transition: .4s;
-            border-radius: 34px;
-        }
-        
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        
-        input:checked + .toggle-slider {
-            background-color: var(--primary-color);
-        }
-        
-        input:checked + .toggle-slider:before {
-            transform: translateX(26px);
-        }
-        
-        .pin-state {
-            margin-top: 10px;
-            font-size: 0.9rem;
-        }
     </style>
 </head>
 <body>
@@ -322,7 +252,6 @@
     <div class="tab-container">
         <div class="tabs">
             <button class="tab-button active" data-tab="motor-config">Motor Configuration</button>
-            <button class="tab-button" data-tab="gpio-control">GPIO Control</button>
         </div>
     </div>
     
@@ -380,79 +309,6 @@
             <a href="/">Back to Control Panel</a>
         </div>
     </div>
-    
-    <div id="gpio-control" class="container tab-content">
-        <h2>GPIO Pin Control</h2>
-        
-        <div class="pin-diagram">
-            <h3>ESP32 GPIO Pin Diagram</h3>
-            <pre>
-┌────────────────────────┐
-│                        │
-│    ESP32-CAM Module    │
-│                        │
-└───┬──┬──┬──┬──┬──┬──┬──┘
-    │  │  │  │  │  │  │
-    │  │  │  │  │  │  └── GND
-    │  │  │  │  │  └───── 5V
-    │  │  │  │  └──────── GPIO 14
-    │  │  │  └─────────── GPIO 15
-    │  │  └────────────── GPIO 13
-    │  └───────────────── GPIO 12
-    └──────────────────── GPIO 2 (LED)
-            </pre>
-        </div>
-        
-        <p>Toggle digital GPIO pins 12-15 on the ESP32-CAM:</p>
-        
-        <div class="gpio-controls">
-            <div class="gpio-control">
-                <div class="gpio-label">GPIO 12</div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="gpio-12">
-                    <span class="toggle-slider"></span>
-                </label>
-                <div class="pin-state" id="gpio-12-state">LOW</div>
-            </div>
-            
-            <div class="gpio-control">
-                <div class="gpio-label">GPIO 13</div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="gpio-13">
-                    <span class="toggle-slider"></span>
-                </label>
-                <div class="pin-state" id="gpio-13-state">LOW</div>
-            </div>
-            
-            <div class="gpio-control">
-                <div class="gpio-label">GPIO 14</div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="gpio-14">
-                    <span class="toggle-slider"></span>
-                </label>
-                <div class="pin-state" id="gpio-14-state">LOW</div>
-            </div>
-            
-            <div class="gpio-control">
-                <div class="gpio-label">GPIO 15</div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="gpio-15">
-                    <span class="toggle-slider"></span>
-                </label>
-                <div class="pin-state" id="gpio-15-state">LOW</div>
-            </div>
-        </div>
-        
-        <div class="button-group" style="margin-top: 30px;">
-            <button id="refresh-gpio" class="btn-secondary">Refresh States</button>
-        </div>
-        
-        <div id="gpio-message" class="message"></div>
-        
-        <div class="nav-links">
-            <a href="/">Back to Control Panel</a>
-        </div>
-    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -485,18 +341,6 @@
             const setPinsButton = document.getElementById('set-pins');
             const resetPinsButton = document.getElementById('reset-pins');
             const messageElement = document.getElementById('message');
-            
-            // GPIO control elements
-            const gpio12Toggle = document.getElementById('gpio-12');
-            const gpio13Toggle = document.getElementById('gpio-13');
-            const gpio14Toggle = document.getElementById('gpio-14');
-            const gpio15Toggle = document.getElementById('gpio-15');
-            const gpio12State = document.getElementById('gpio-12-state');
-            const gpio13State = document.getElementById('gpio-13-state');
-            const gpio14State = document.getElementById('gpio-14-state');
-            const gpio15State = document.getElementById('gpio-15-state');
-            const refreshGpioButton = document.getElementById('refresh-gpio');
-            const gpioMessageElement = document.getElementById('gpio-message');
             
             // Default pin values
             const DEFAULT_M1P1 = 12;
@@ -540,32 +384,6 @@
                             m2p2Input.value = msg.m2p2;
                             
                             showMessage('Current pin configuration loaded', 'success');
-                        } else if (msg.type === 'gpio_state') {
-                            // Update GPIO toggle state
-                            const pin = msg.pin;
-                            const state = msg.state;
-                            
-                            // Update the corresponding toggle and state text
-                            switch (pin) {
-                                case 12:
-                                    gpio12Toggle.checked = state === 1;
-                                    gpio12State.textContent = state === 1 ? 'HIGH' : 'LOW';
-                                    break;
-                                case 13:
-                                    gpio13Toggle.checked = state === 1;
-                                    gpio13State.textContent = state === 1 ? 'HIGH' : 'LOW';
-                                    break;
-                                case 14:
-                                    gpio14Toggle.checked = state === 1;
-                                    gpio14State.textContent = state === 1 ? 'HIGH' : 'LOW';
-                                    break;
-                                case 15:
-                                    gpio15Toggle.checked = state === 1;
-                                    gpio15State.textContent = state === 1 ? 'HIGH' : 'LOW';
-                                    break;
-                            }
-                            
-                            showGpioMessage(`GPIO ${pin} state updated`, 'success');
                         }
                     } catch (e) {
                         console.error('Error parsing message:', e);
@@ -658,61 +476,6 @@
                 }
             });
             
-            // GPIO toggle event handlers
-            gpio12Toggle.addEventListener('change', function() {
-                toggleGpioPin(12, this.checked ? 1 : 0);
-            });
-            
-            gpio13Toggle.addEventListener('change', function() {
-                toggleGpioPin(13, this.checked ? 1 : 0);
-            });
-            
-            gpio14Toggle.addEventListener('change', function() {
-                toggleGpioPin(14, this.checked ? 1 : 0);
-            });
-            
-            gpio15Toggle.addEventListener('change', function() {
-                toggleGpioPin(15, this.checked ? 1 : 0);
-            });
-            
-            // Refresh GPIO states button
-            refreshGpioButton.addEventListener('click', function() {
-                if (socket.readyState === WebSocket.OPEN) {
-                    // Request state for all GPIO pins 12-15
-                    for (let pin = 12; pin <= 15; pin++) {
-                        const data = new Uint8Array([
-                            Commands.CMD_GET_GPIO,
-                            pin
-                        ]);
-                        socket.send(data);
-                        console.log(`Sent GET_GPIO command for pin ${pin}`);
-                    }
-                    
-                    showGpioMessage('Refreshing GPIO states...', 'success');
-                } else {
-                    showGpioMessage('WebSocket not connected', 'error');
-                }
-            });
-            
-            // Function to toggle GPIO pin
-            function toggleGpioPin(pin, state) {
-                if (socket.readyState === WebSocket.OPEN) {
-                    const data = new Uint8Array([
-                        Commands.CMD_SET_GPIO,
-                        pin,
-                        state
-                    ]);
-                    socket.send(data);
-                    console.log(`Sent SET_GPIO command: pin=${pin}, state=${state}`);
-                } else {
-                    showGpioMessage('WebSocket not connected', 'error');
-                    
-                    // Reset toggle to previous state since the command failed
-                    const toggle = document.getElementById(`gpio-${pin}`);
-                    toggle.checked = !toggle.checked;
-                }
-            }
-            
             // Helper function to show messages
             function showMessage(text, type) {
                 messageElement.textContent = text;
@@ -721,17 +484,6 @@
                 // Hide message after 3 seconds
                 setTimeout(function() {
                     messageElement.className = 'message';
-                }, 3000);
-            }
-            
-            // Helper function to show GPIO messages
-            function showGpioMessage(text, type) {
-                gpioMessageElement.textContent = text;
-                gpioMessageElement.className = `message ${type}`;
-                
-                // Hide message after 3 seconds
-                setTimeout(function() {
-                    gpioMessageElement.className = 'message';
                 }, 3000);
             }
         });
